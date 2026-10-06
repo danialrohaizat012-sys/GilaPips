@@ -25,3 +25,37 @@ $('google-login').onclick=()=>{if(!$('member-consent').checked){status('Sila ber
 $('reset-password').onclick=()=>run(async()=>{const email=$('member-email').value.trim();if(!email){status('Masukkan email dahulu.');return;}await A.sendPasswordResetEmail(auth,email);status('Jika akaun berkenaan tersedia, arahan reset akan dihantar melalui email.');});
 $('verify-email').onclick=()=>run(async()=>{if(auth.currentUser)await A.sendEmailVerification(auth.currentUser);status('Email pengesahan dihantar.');});
 $('logout').onclick=()=>run(async()=>{await A.signOut(auth);status('Anda sudah log keluar.');});
+
+let membershipUnsubscribe=null;
+function refreshMembership(user){
+ if(membershipUnsubscribe){membershipUnsubscribe();membershipUnsubscribe=null;}
+ $('admin-panel').hidden=true;$('admin-requests').replaceChildren();
+ if(!user)return;
+ $('registration-name').value=user.displayName||'';
+ membershipUnsubscribe=F.onSnapshot(F.doc(db,'verificationRequests',user.uid),snap=>{
+  if(auth.currentUser?.uid!==user.uid)return;
+  const data=snap.exists()?snap.data():null;const state=data?.status||'registered';
+  const states={registered:'Pengguna berdaftar',pending:'Menunggu semakan',approved:'Ahli disahkan',rejected:'Belum disahkan'};
+  $('membership-state').textContent=states[state]||states.registered;
+  $('membership-message').textContent=state==='approved'?'Pendaftaran anda telah disahkan. Manfaat khas akan dibuka apabila tersedia.':state==='pending'?'Danial akan menyemak pendaftaran anda. Bahan percuma kekal tersedia.':state==='rejected'?'Pendaftaran belum dapat disahkan. Hubungi Danial untuk semakan lanjut.':'Mohon pengesahan jika anda mendaftar trading atau Public Gold melalui Danial.';
+  $('verification-form').hidden=state==='pending'||state==='approved';
+ },()=>{$('membership-message').textContent='Status belum boleh dibaca. Security rules dashboard perlu diterbitkan.';});
+ F.getDoc(F.doc(db,'admins',user.uid)).then(s=>{if(auth.currentUser?.uid===user.uid&&s.exists()&&s.data().enabled===true){$('admin-panel').hidden=false;loadRequests();}}).catch(()=>{});
+}
+ready.then(()=>A.onAuthStateChanged(auth,refreshMembership)).catch(()=>{});
+$('verification-form').onsubmit=e=>{e.preventDefault();run(async()=>{
+ if(!auth.currentUser||!$('verification-form').reportValidity())return;
+ const user=auth.currentUser;
+ await F.setDoc(F.doc(db,'verificationRequests',user.uid),{type:$('registration-type').value,registrationName:$('registration-name').value.trim(),status:'pending',submittedAt:F.serverTimestamp(),consentVersion:'2026-10-06'});
+ status('Permohonan dihantar. Menunggu semakan Danial.');
+});};
+async function loadRequests(){
+ const panel=$('admin-requests');panel.textContent='Memuatkan permohonan…';
+ try{
+  const snap=await F.getDocs(F.query(F.collection(db,'verificationRequests'),F.where('status','==','pending'),F.limit(50)));
+  panel.replaceChildren();if(snap.empty){panel.textContent='Tiada permohonan menunggu semakan.';return;}
+  for(const item of snap.docs){const d=item.data();const row=document.createElement('div');row.className='request-row';const name=document.createElement('strong');name.textContent=d.registrationName;const info=document.createElement('small');info.textContent=(d.type==='trading'?'Trading':'Public Gold')+' · UID: '+item.id;row.append(name,info);
+   for(const [label,result] of [['Luluskan','approved'],['Tolak','rejected']]){const button=document.createElement('button');button.textContent=label;button.onclick=()=>{if(result==='approved'&&!confirm('Pendaftaran ini telah disahkan bawah GilaPips?'))return;run(async()=>{await F.updateDoc(F.doc(db,'verificationRequests',item.id),{status:result,reviewedAt:F.serverTimestamp(),reviewedBy:auth.currentUser.uid});status(result==='approved'?'Ahli disahkan.':'Permohonan ditolak.');await loadRequests();});};row.append(button);}panel.append(row);}
+ }catch{panel.textContent='Senarai tidak dapat dimuatkan. Semak akses admin dan security rules.';}
+}
+$('admin-refresh').onclick=()=>run(loadRequests);
