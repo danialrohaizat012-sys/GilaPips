@@ -37,6 +37,8 @@ function refreshMembership(user){
   const data=snap.exists()?snap.data():null;const state=data?.status||'registered';
   const states={registered:'Pengguna berdaftar',pending:'Menunggu semakan',approved:'Ahli disahkan',rejected:'Belum disahkan'};
   $('membership-state').textContent=states[state]||states.registered;
+  const next={registered:['LANGKAH SETERUSNYA','Mohon pengesahan pendaftaran','Pilih salah satu pendaftaran melalui GilaPips dan hantar permohonan di bawah.'],pending:['MENUNGGU SEMAKAN','Permohonan sedang disemak','Tiada tindakan tambahan diperlukan buat masa ini. Bahan percuma masih boleh digunakan.'],approved:['PENDAFTARAN DISAHKAN','Kelayakan ahli sudah disahkan','PITIS dan bahan khas belum tersedia. Status ini mengesahkan pendaftaran, bukan akses aplikasi.'],rejected:['PERLU SEMAKAN LANJUT','Pendaftaran belum dapat disahkan','Semak maklumat pendaftaran. Hubungi Danial atau hantar semula maklumat yang betul.']}[state]||['LANGKAH SETERUSNYA','Mohon pengesahan','Hantar permohonan di bawah.'];
+  $('member-next-label').textContent=next[0];$('member-next-title').textContent=next[1];$('member-next-copy').textContent=next[2];
   $('membership-message').textContent=state==='approved'?'Pendaftaran anda telah disahkan. Manfaat khas akan dibuka apabila tersedia.':state==='pending'?'Danial akan menyemak pendaftaran anda. Bahan percuma kekal tersedia.':state==='rejected'?'Pendaftaran belum dapat disahkan. Hubungi Danial untuk semakan lanjut.':'Mohon pengesahan jika anda mendaftar trading atau Public Gold melalui Danial.';
   $('verification-form').hidden=state==='pending'||state==='approved';
  },()=>{$('membership-message').textContent='Status belum boleh dibaca. Security rules dashboard perlu diterbitkan.';});
@@ -59,3 +61,4 @@ async function loadRequests(){
  }catch{panel.textContent='Senarai tidak dapat dimuatkan. Semak akses admin dan security rules.';}
 }
 $('admin-refresh').onclick=()=>run(loadRequests);
+
