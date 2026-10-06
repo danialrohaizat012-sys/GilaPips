@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  match /members/{uid} {
+   allow read: if request.auth != null && request.auth.uid == uid;
+   allow create: if request.auth != null && request.auth.uid == uid
+    && request.resource.data.keys().hasAll(['displayName','email','createdAt','updatedAt','consentVersion'])
+    && request.resource.data.keys().hasOnly(['displayName','email','createdAt','updatedAt','consentVersion'])
+    && request.resource.data.email == request.auth.token.email
+    && request.resource.data.displayName is string
+    && request.resource.data.displayName.size() > 0
+    && request.resource.data.displayName.size() <= 80
+    && request.resource.data.consentVersion == '2026-10-06'
+    && request.resource.data.createdAt == request.time
+    && request.resource.data.updatedAt == request.time;
+   allow update: if request.auth != null && request.auth.uid == uid
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','updatedAt'])
+    && request.resource.data.displayName is string
+    && request.resource.data.displayName.size() > 0
+    && request.resource.data.displayName.size() <= 80
+    && request.resource.data.updatedAt == request.time;
+   allow delete: if false;
+  }
+  match /{document=**} { allow read, write: if false; }
+ }
+}
