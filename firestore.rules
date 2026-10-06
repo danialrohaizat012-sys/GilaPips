@@ -21,6 +21,35 @@ service cloud.firestore {
     && request.resource.data.updatedAt == request.time;
    allow delete: if false;
   }
+  function isAdmin() { return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.enabled == true; }
+  match /admins/{uid} {
+   allow get: if request.auth != null && request.auth.uid == uid;
+   allow list, write: if false;
+  }
+  match /verificationRequests/{uid} {
+   function own() { return request.auth != null && request.auth.uid == uid; }
+   function validRequest() {
+    return request.resource.data.keys().hasAll(['type','registrationName','status','submittedAt','consentVersion'])
+     && request.resource.data.keys().hasOnly(['type','registrationName','status','submittedAt','consentVersion'])
+     && request.resource.data.type in ['trading','public-gold']
+     && request.resource.data.registrationName is string
+     && request.resource.data.registrationName.size() > 0
+     && request.resource.data.registrationName.size() <= 80
+     && request.resource.data.status == 'pending'
+     && request.resource.data.submittedAt == request.time
+     && request.resource.data.consentVersion == '2026-10-06';
+   }
+   allow get: if own() || isAdmin();
+   allow list: if isAdmin();
+   allow create: if own() && validRequest();
+   allow update: if (own() && resource.data.status == 'rejected' && validRequest())
+    || (isAdmin() && resource.data.status == 'pending'
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewedAt','reviewedBy'])
+     && request.resource.data.status in ['approved','rejected']
+     && request.resource.data.reviewedAt == request.time
+     && request.resource.data.reviewedBy == request.auth.uid);
+   allow delete: if false;
+  }
   match /{document=**} { allow read, write: if false; }
  }
 }
